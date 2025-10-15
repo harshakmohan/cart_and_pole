@@ -23,10 +23,10 @@
             <!-- Pole -->
             <body name="pole" pos="0 0 0">
                 <!-- Pole can rotate around y-axis (in 2D plane) -->
-                <joint name="hinge" type="hinge" pos="0 0 0" axis="0 1 0"/>
+                <joint name="hinge" type="hinge" pos="0 0 0" axis="0 1 0" ref="3.14159"/>
                 <geom name="pole_geom" type="capsule" fromto="0 0 0 0 0 0.5" size="0.02" rgba="0.3 0.3 0.7 1" mass="0.1"/>
                 <!-- Add a small sphere at the tip for visual clarity -->
-                <geom name="pole_tip" type="sphere" pos="0 0 0.5" size="0.03" rgba="0.9 0.1 0.1 1" mass="0.01"/>
+                <geom name="pole_tip" type="sphere" pos="0 0 0.5" size="0.03" rgba="0.9 0.1 0.1 1" mass="0.05"/>
             </body>
         </body>
     </worldbody>

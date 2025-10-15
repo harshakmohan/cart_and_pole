@@ -5,36 +5,48 @@
 #include <tuple>
 #include <random>
 #include <memory>
+#include "environment.h"
+#include "config.h"
 #include "mujoco/mujoco.h"
 
 // Forward declaration to avoid including GLFW in header
 struct GLFWwindow;
 
-class CartPoleEnv {
+class CartPoleEnv : public Environment {
 public:
     // Constructor and destructor
     CartPoleEnv(const std::string& model_path, bool render = false);
-    ~CartPoleEnv();
+    CartPoleEnv(const Config& config);  // New constructor for factory system
+    ~CartPoleEnv() override;
     
-    // OpenAI Gym-style interface
-    std::vector<double> reset();
-    std::tuple<std::vector<double>, double, bool, std::string> step(double action);
-    void render();
-    void close();
+    // Environment interface implementation
+    State reset() override;
+    StepResult step(Action action) override;
+    void render() override;
+    void close() override;
     
-    // Get observation and action space info
-    std::vector<double> getObservationSpaceLow() const;
-    std::vector<double> getObservationSpaceHigh() const;
-    double getActionSpaceLow() const { return -max_force_; }
-    double getActionSpaceHigh() const { return max_force_; }
-    int getObservationSpaceSize() const { return 4; }  // [x, x_dot, theta, theta_dot]
-    int getActionSpaceSize() const { return 1; }  // [force]
+    // Environment metadata (implementing base class interface)
+    int getObservationSpaceSize() const override { return 4; }  // [x, x_dot, theta, theta_dot]
+    int getActionSpaceSize() const override { return 1; }  // [force]
+    std::vector<double> getObservationSpaceLow() const override;
+    std::vector<double> getObservationSpaceHigh() const override;
+    double getActionSpaceLow() const override { return -max_force_; }
+    double getActionSpaceHigh() const override { return max_force_; }
+    
+    // Environment identification
+    std::string getName() const override { return "CartPole-v1"; }
+    std::string getDescription() const override { 
+        return "Classic cart-pole control task using MuJoCo physics"; 
+    }
     
     // Get current state
-    std::vector<double> getState() const;
+    State getCurrentState() const override;
     
     // Set rendering mode
-    void setRenderMode(bool render) { render_enabled_ = render; }
+    void setRenderMode(bool render) override { render_enabled_ = render; }
+    
+    // Check if window should close (for proper event handling)
+    bool shouldClose() const;
     
 private:
     // MuJoCo model and data

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 #include "GLFW/glfw3.h"
+#include "environment_factory.h"
 
 CartPoleEnv::CartPoleEnv(const std::string& model_path, bool render)
     : model_(nullptr), data_(nullptr), cam_(nullptr), opt_(nullptr),
@@ -13,6 +14,34 @@ CartPoleEnv::CartPoleEnv(const std::string& model_path, bool render)
       render_enabled_(render) {
     
     // Load MuJoCo model
+    char error[1000] = "Could not load model";
+    model_ = mj_loadXML(model_path.c_str(), nullptr, error, sizeof(error));
+    if (!model_) {
+        throw std::runtime_error(std::string("Failed to load MuJoCo model: ") + error);
+    }
+    
+    // Create data
+    data_ = mj_makeData(model_);
+    
+    // Initialize rendering if enabled
+    if (render_enabled_) {
+        initializeRendering();
+    }
+}
+
+CartPoleEnv::CartPoleEnv(const Config& config)
+    : model_(nullptr), data_(nullptr), cam_(nullptr), opt_(nullptr),
+      scn_(nullptr), con_(nullptr), window_(nullptr),
+      max_force_(config.get<double>("max_force", 10.0)), 
+      x_threshold_(config.get<double>("x_threshold", 2.4)), 
+      theta_threshold_radians_(config.get<double>("theta_threshold_degrees", 12.0) * M_PI / 180),
+      max_episode_steps_(config.get<int>("max_episode_steps", 500)), 
+      current_step_(0),
+      rng_(std::random_device{}()), uniform_dist_(-0.05, 0.05),
+      render_enabled_(config.get<bool>("render", false)) {
+    
+    // Load MuJoCo model
+    std::string model_path = config.get<std::string>("model_path", "mujoco/cartpole.xml");
     char error[1000] = "Could not load model";
     model_ = mj_loadXML(model_path.c_str(), nullptr, error, sizeof(error));
     if (!model_) {
@@ -100,15 +129,9 @@ void CartPoleEnv::cleanupRendering() {
     }
 }
 
-std::vector<double> CartPoleEnv::reset() {
-    // Reset simulation data
+State CartPoleEnv::reset() {
+    // Reset simulation data to XML defaults (pole hanging down due to ref="3.14159")
     mj_resetData(model_, data_);
-    
-    // Set small random initial conditions
-    data_->qpos[0] = uniform_dist_(rng_);  // cart position
-    data_->qpos[1] = uniform_dist_(rng_);  // pole angle
-    data_->qvel[0] = uniform_dist_(rng_);  // cart velocity
-    data_->qvel[1] = uniform_dist_(rng_);  // pole angular velocity
     
     // Forward dynamics to compute derived quantities
     mj_forward(model_, data_);
@@ -116,10 +139,10 @@ std::vector<double> CartPoleEnv::reset() {
     // Reset step counter
     current_step_ = 0;
     
-    return getState();
+    return getCurrentState();
 }
 
-std::tuple<std::vector<double>, double, bool, std::string> CartPoleEnv::step(double action) {
+StepResult CartPoleEnv::step(Action action) {
     // Clip action to valid range
     action = std::max(-max_force_, std::min(max_force_, action));
     
@@ -130,7 +153,7 @@ std::tuple<std::vector<double>, double, bool, std::string> CartPoleEnv::step(dou
     mj_step(model_, data_);
     
     // Get new state
-    std::vector<double> state = getState();
+    State state = getCurrentState();
     
     // Check if done
     bool done = isDone() || (++current_step_ >= max_episode_steps_);
@@ -144,7 +167,7 @@ std::tuple<std::vector<double>, double, bool, std::string> CartPoleEnv::step(dou
     return std::make_tuple(state, reward, done, info);
 }
 
-std::vector<double> CartPoleEnv::getState() const {
+State CartPoleEnv::getCurrentState() const {
     return {
         data_->qpos[0],  // cart position
         data_->qvel[0],  // cart velocity
@@ -157,21 +180,20 @@ bool CartPoleEnv::isDone() const {
     double x = data_->qpos[0];
     double theta = data_->qpos[1];
     
-    return (x < -x_threshold_ || x > x_threshold_ ||
-            theta < -theta_threshold_radians_ || theta > theta_threshold_radians_);
+    // Episode ends if cart goes out of bounds
+    // For swing-up task, let pole swing freely (no angle limits)
+    return (x < -x_threshold_ || x > x_threshold_);
 }
 
 double CartPoleEnv::computeReward(const std::vector<double>& state, bool done) const {
-    if (!done) {
-        // Standard reward: +1 for each step the pole remains upright
-        return 1.0;
-    } else if (current_step_ >= max_episode_steps_) {
-        // Bonus for reaching max steps
-        return 1.0;
-    } else {
-        // Penalty for falling
-        return 0.0;
-    }
+    double theta = state[2];  // pole angle
+    
+    // Reward based on how close pole is to upright (θ = 0 or θ = 2π)
+    // cos(θ) = 1 when upright, -1 when hanging down
+    double upright_reward = cos(theta);  // Range: [-1, 1]
+    
+    // Scale to [0, 2] so upright gives +2, hanging gives 0
+    return upright_reward + 1.0;
 }
 
 void CartPoleEnv::render() {
@@ -201,7 +223,7 @@ void CartPoleEnv::render() {
              "Step: %d\nCart Pos: %.3f\nPole Angle: %.3f rad (%.1f deg)\nReward: %.1f",
              current_step_, data_->qpos[0], data_->qpos[1], 
              data_->qpos[1] * 180.0 / M_PI, 
-             computeReward(getState(), isDone()));
+             computeReward(getCurrentState(), isDone()));
     mjr_overlay(mjFONT_NORMAL, mjGRID_TOPLEFT, viewport, info, nullptr, con_);
     
     // Swap buffers
@@ -232,4 +254,21 @@ std::vector<double> CartPoleEnv::getObservationSpaceLow() const {
 
 std::vector<double> CartPoleEnv::getObservationSpaceHigh() const {
     return {x_threshold_ * 2, INFINITY, theta_threshold_radians_ * 2, INFINITY};
+}
+
+bool CartPoleEnv::shouldClose() const {
+    return render_enabled_ && window_ && glfwWindowShouldClose(window_);
+}
+
+// Register CartPole environment with the factory
+namespace {
+    struct CartPoleRegistrar {
+        CartPoleRegistrar() {
+            EnvironmentFactory::registerEnvironment("cartpole", 
+                [](const Config& config) -> std::unique_ptr<Environment> {
+                    return std::make_unique<CartPoleEnv>(config);
+                });
+        }
+    };
+    static CartPoleRegistrar cartpole_registrar;
 }

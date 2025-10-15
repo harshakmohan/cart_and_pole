@@ -42,7 +42,7 @@ int main() {
             bool done = false;
             int steps = 0;
             
-            while (!done) {
+            while (!done && !env.shouldClose()) {
                 // Render
                 env.render();
                 
@@ -60,6 +60,12 @@ int main() {
                 
                 // Add small delay for visualization
                 std::this_thread::sleep_for(std::chrono::milliseconds(16));  // ~60 FPS
+            }
+            
+            // Check if user closed window
+            if (env.shouldClose()) {
+                std::cout << "Window closed by user, exiting..." << std::endl;
+                break;  // Exit episode loop
             }
             
             std::cout << "Episode finished after " << steps << " steps" << std::endl;
