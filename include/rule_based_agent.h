@@ -1,8 +1,7 @@
 #ifndef RULE_BASED_AGENT_H
 #define RULE_BASED_AGENT_H
 
-#include "../agent.h"
-#include "../config.h"
+#include "agent.h"
 
 /**
  * Simple rule-based agent for CartPole.
@@ -11,7 +10,6 @@
 class RuleBasedAgent : public Agent {
 public:
     RuleBasedAgent(double max_force = 10.0);
-    RuleBasedAgent(const Config& config);
     ~RuleBasedAgent() override = default;
     
     // Agent interface implementation

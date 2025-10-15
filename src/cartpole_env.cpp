@@ -3,7 +3,6 @@
 #include <cmath>
 #include <stdexcept>
 #include "GLFW/glfw3.h"
-#include "environment_factory.h"
 
 CartPoleEnv::CartPoleEnv(const std::string& model_path, bool render)
     : model_(nullptr), data_(nullptr), cam_(nullptr), opt_(nullptr),
@@ -29,33 +28,6 @@ CartPoleEnv::CartPoleEnv(const std::string& model_path, bool render)
     }
 }
 
-CartPoleEnv::CartPoleEnv(const Config& config)
-    : model_(nullptr), data_(nullptr), cam_(nullptr), opt_(nullptr),
-      scn_(nullptr), con_(nullptr), window_(nullptr),
-      max_force_(config.get<double>("max_force", 10.0)), 
-      x_threshold_(config.get<double>("x_threshold", 2.4)), 
-      theta_threshold_radians_(config.get<double>("theta_threshold_degrees", 12.0) * M_PI / 180),
-      max_episode_steps_(config.get<int>("max_episode_steps", 500)), 
-      current_step_(0),
-      rng_(std::random_device{}()), uniform_dist_(-0.05, 0.05),
-      render_enabled_(config.get<bool>("render", false)) {
-    
-    // Load MuJoCo model
-    std::string model_path = config.get<std::string>("model_path", "mujoco/cartpole.xml");
-    char error[1000] = "Could not load model";
-    model_ = mj_loadXML(model_path.c_str(), nullptr, error, sizeof(error));
-    if (!model_) {
-        throw std::runtime_error(std::string("Failed to load MuJoCo model: ") + error);
-    }
-    
-    // Create data
-    data_ = mj_makeData(model_);
-    
-    // Initialize rendering if enabled
-    if (render_enabled_) {
-        initializeRendering();
-    }
-}
 
 CartPoleEnv::~CartPoleEnv() {
     close();
@@ -260,15 +232,3 @@ bool CartPoleEnv::shouldClose() const {
     return render_enabled_ && window_ && glfwWindowShouldClose(window_);
 }
 
-// Register CartPole environment with the factory
-namespace {
-    struct CartPoleRegistrar {
-        CartPoleRegistrar() {
-            EnvironmentFactory::registerEnvironment("cartpole", 
-                [](const Config& config) -> std::unique_ptr<Environment> {
-                    return std::make_unique<CartPoleEnv>(config);
-                });
-        }
-    };
-    static CartPoleRegistrar cartpole_registrar;
-}

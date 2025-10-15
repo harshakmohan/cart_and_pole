@@ -32,21 +32,7 @@ add_executable(cartpole src/main.cpp)
 target_include_directories(cartpole PRIVATE include ${MUJOCO_INCLUDE_PATH})
 target_link_libraries(cartpole PRIVATE ${MUJOCO_LIB} glfw)
 
-# Test environment executable (original)
-add_executable(test_env src/test_env.cpp src/cartpole_env.cpp src/environment_factory.cpp src/config.cpp)
+# Test environment executable
+add_executable(test_env src/test_env.cpp src/cartpole_env.cpp src/agents/rule_based_agent.cpp)
 target_include_directories(test_env PRIVATE include ${MUJOCO_INCLUDE_PATH})
 target_link_libraries(test_env PRIVATE ${MUJOCO_LIB} glfw)
-
-# Framework test executable
-add_executable(test_framework 
-    src/test_framework.cpp
-    src/cartpole_env.cpp
-    src/environment_factory.cpp
-    src/agent_factory.cpp
-    src/experiment_runner.cpp
-    src/config.cpp
-    src/agents/random_agent.cpp
-    src/agents/rule_based_agent.cpp
-)
-target_include_directories(test_framework PRIVATE include ${MUJOCO_INCLUDE_PATH})
-target_link_libraries(test_framework PRIVATE ${MUJOCO_LIB} glfw)

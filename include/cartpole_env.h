@@ -6,7 +6,6 @@
 #include <random>
 #include <memory>
 #include "environment.h"
-#include "config.h"
 #include "mujoco/mujoco.h"
 
 // Forward declaration to avoid including GLFW in header
@@ -16,7 +15,6 @@ class CartPoleEnv : public Environment {
 public:
     // Constructor and destructor
     CartPoleEnv(const std::string& model_path, bool render = false);
-    CartPoleEnv(const Config& config);  // New constructor for factory system
     ~CartPoleEnv() override;
     
     // Environment interface implementation

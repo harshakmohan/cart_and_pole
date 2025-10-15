@@ -1,16 +1,10 @@
-#include "../include/agents/rule_based_agent.h"
-#include "../include/agent_factory.h"
+#include "../include/rule_based_agent.h"
 
 RuleBasedAgent::RuleBasedAgent(double max_force)
     : max_force_(max_force), total_actions_(0), last_action_(0.0),
       left_actions_(0), right_actions_(0) {
 }
 
-RuleBasedAgent::RuleBasedAgent(const Config& config)
-    : max_force_(config.get<double>("max_force", 10.0)),
-      total_actions_(0), last_action_(0.0),
-      left_actions_(0), right_actions_(0) {
-}
 
 Action RuleBasedAgent::act(const State& state) {
     if (state.size() < 4) {
@@ -54,15 +48,3 @@ std::vector<std::pair<std::string, double>> RuleBasedAgent::getStats() const {
     };
 }
 
-// Register RuleBasedAgent with the factory
-namespace {
-    struct RuleBasedAgentRegistrar {
-        RuleBasedAgentRegistrar() {
-            AgentFactory::registerAgent("rule_based", 
-                [](const Config& config) -> std::unique_ptr<Agent> {
-                    return std::make_unique<RuleBasedAgent>(config);
-                });
-        }
-    };
-    static RuleBasedAgentRegistrar rule_based_agent_registrar;
-}
